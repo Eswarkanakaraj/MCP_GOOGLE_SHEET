@@ -102,7 +102,7 @@ Add the following configuration inside the `"mcpServers"` object:
     "GoogleSheetsSync": {
       "command": "node",
       "args": [
-        "d:/Shrewd/Ceezet/google-sheet-sync/mcp_server.js"
+        "your mcp_server.js path"
       ],
       "env": {}
     }
