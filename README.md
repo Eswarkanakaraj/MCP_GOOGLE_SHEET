@@ -1,6 +1,11 @@
+
+Hurray!!!!
+
 # Google Sheets MCP Server Documentation 📊🤖
 
 This document provides a complete, step-by-step guide to how our Model Context Protocol (MCP) connection works, how to configure Google Cloud credentials, and how to manage the synchronization between your AI assistant and Google Sheets.
+
+
 
 ---
 
