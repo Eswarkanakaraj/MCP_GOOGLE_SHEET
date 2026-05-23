@@ -257,96 +257,203 @@ flowchart TD
 
 ---
 
-## 🧰 Available MCP Tools
+## 🧰 Available MCP Tools (22 Total)
 
-### 1. `read_google_sheet`
-
-Reads cell values from any range in the spreadsheet.
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `range` | string | ✅ | A1 notation (e.g., `'Sheet1!A1:Z100'`) |
-
-**Example prompt:**
-> *"Read all data from Sheet1, rows 1 to 50."*
+The server exposes 22 powerful tools to interact with Google Sheets and Google Drive. If `spreadsheet_id` is omitted in any tool, the server automatically falls back to the default `sheet_id` configured in your `.env`.
 
 ---
 
-### 2. `update_google_sheet`
+### 📂 1. Spreadsheet & Drive Management
 
-Writes values to a specific range in the spreadsheet.
+#### `list_spreadsheets`
+Lists Google Spreadsheets accessible by your account, optionally inside a specific folder.
+* **Parameters:**
+  * `folder_id` *(string, optional)*: Google Drive folder ID to search in.
+* **Example prompt:** `"List all spreadsheets in my Drive folder '1A2b3C...'"`
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `range` | string | ✅ | A1 notation (e.g., `'Sheet1!A2:C2'`) |
-| `values` | string[] | ✅ | Array of values (e.g., `['Task 1', 'Done', '2026-05-23']`) |
+#### `create_spreadsheet`
+Creates a brand new Google Spreadsheet, optionally placing it inside a specific Drive folder.
+* **Parameters:**
+  * `title` *(string, required)*: The title of the spreadsheet (e.g. `'Quarterly Report'`).
+  * `folder_id` *(string, optional)*: Google Drive folder ID to place the spreadsheet in.
+* **Example prompt:** `"Create a new spreadsheet called 'Marketing Q3' inside folder '1aBcDe...'"`
 
-**Example prompt:**
-> *"Add a new row: Task ID 101, Module 'Auth', Status 'In Progress' to Sheet1 row 15."*
-
----
-
-### 3. `format_google_sheet`
-
-Applies font formatting across a range of cells.
-
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `fontFamily` | string | ✅ | — | Font name (e.g., `'Inter'`, `'Roboto'`) |
-| `sheetId` | integer | ❌ | `0` | Sheet tab ID |
-| `startRowIndex` | integer | ❌ | `0` | Start row (0-based) |
-| `endRowIndex` | integer | ❌ | `1000` | End row (exclusive) |
-| `startColumnIndex` | integer | ❌ | `0` | Start column (0-based) |
-| `endColumnIndex` | integer | ❌ | `26` | End column (exclusive) |
-
-**Example prompt:**
-> *"Set the font to 'Inter' for the entire Tasks sheet."*
+#### `share_spreadsheet`
+Shares a spreadsheet with specific Google accounts and assigns permissions.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `recipients` *(array of objects, required)*: List of `[{ "email_address": "user@example.com", "role": "writer" }]` (roles: `reader`, `commenter`, `writer`).
+  * `send_notification` *(boolean, optional, default: true)*: Whether to email the recipients.
+* **Example prompt:** `"Share this spreadsheet with john@example.com as a writer and jane@example.com as a reader."`
 
 ---
 
-### 4. `add_dropdown_validation`
+### 🗂️ 2. Sheet / Tab Operations
 
-Adds a data validation dropdown (select list) to a column.
+#### `list_sheets`
+Lists the titles of all sheet tabs inside a spreadsheet.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+* **Example prompt:** `"What are the tab names in my current spreadsheet?"`
 
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `columnIndex` | integer | ✅ | — | 0-based column index (e.g., `3` for column D) |
-| `options` | string[] | ✅ | — | Allowed values (e.g., `['Pending', 'Done']`) |
-| `sheetId` | integer | ❌ | `0` | Sheet tab ID |
-| `startRowIndex` | integer | ❌ | `2` | Start row (0-based) |
-| `endRowIndex` | integer | ❌ | `1000` | End row (exclusive) |
+#### `create_sheet`
+Creates a new sheet tab in a spreadsheet.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `title` *(string, required)*: Name of the new tab.
+* **Example prompt:** `"Add a new tab called 'Invoices' to the spreadsheet."`
 
-**Example prompt:**
-> *"Add a dropdown to column D with options: 'Not Started', 'In Progress', 'Completed' — starting from row 3."*
+#### `rename_sheet`
+Renames an existing sheet tab.
+* **Parameters:**
+  * `spreadsheet` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Current tab name (e.g. `'Sheet1'`).
+  * `new_name` *(string, required)*: New tab name (e.g. `'Dashboard'`).
+* **Example prompt:** `"Rename the tab 'Sheet1' to 'Active Users'."`
+
+#### `copy_sheet`
+Duplicates a sheet tab from a source spreadsheet to a destination spreadsheet, optionally renaming it.
+* **Parameters:**
+  * `src_spreadsheet` *(string, optional)*: Source spreadsheet ID.
+  * `src_sheet` *(string, required)*: Source tab name.
+  * `dst_spreadsheet` *(string, required)*: Destination spreadsheet ID.
+  * `dst_sheet` *(string, optional)*: Desired name in the destination spreadsheet.
+* **Example prompt:** `"Copy the 'Templates' tab from this sheet into spreadsheet '1zXyW...' and rename it 'June Form'."`
+
+#### `create_sheet_tab` *(Backward Compatibility)*
+Creates a new sheet tab inside the default spreadsheet.
+* **Parameters:**
+  * `title` *(string, required)*: Name of the new tab.
 
 ---
 
-### 5. `remove_dropdown_validation`
+### 📖 3. Reading Data
 
-Removes data validation rules from a column.
+#### `get_sheet_data`
+Reads cell values from a sheet tab. Can optionally fetch full styling, metadata, and formulas.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Name of the tab (e.g. `'Sheet1'`).
+  * `range` *(string, optional)*: A1 notation range (e.g. `'A1:C50'`). If omitted, reads the entire tab.
+  * `include_grid_data` *(boolean, optional, default: false)*: If true, returns detailed cell metadata, formulas, and formatting.
+* **Example prompt:** `"Fetch all columns A to D from the 'Users' tab, including formatting."`
 
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `columnIndex` | integer | ✅ | — | 0-based column index |
-| `sheetId` | integer | ❌ | `0` | Sheet tab ID |
-| `startRowIndex` | integer | ❌ | `56` | Start row (0-based) |
-| `endRowIndex` | integer | ❌ | `1000` | End row (exclusive) |
+#### `get_sheet_formulas`
+Reads only the underlying formulas in a range.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Tab name.
+  * `range` *(string, optional)*: A1 range. If omitted, reads all formulas in the tab.
+* **Example prompt:** `"Show me the formulas used in column F of sheet 'Financials'."`
 
-**Example prompt:**
-> *"Remove the dropdown validation from column H."*
+#### `get_multiple_sheet_data`
+Fetches cell values from multiple different ranges/tabs/spreadsheets in a single request.
+* **Parameters:**
+  * `queries` *(array of objects, required)*: List of `[{ "spreadsheet_id": "optional", "sheet": "Sheet1", "range": "A1:B2" }]`.
+* **Example prompt:** `"Read range A1:B10 in 'Sheet1' and range D5:E10 in 'Sheet2' at the same time."`
+
+#### `get_multiple_spreadsheet_summary`
+Fetches titles, tab names, headers, and the first few rows of multiple spreadsheets in a single call (great for high-level folder audits).
+* **Parameters:**
+  * `spreadsheet_ids` *(array of strings, required)*: List of spreadsheet IDs.
+  * `rows_to_fetch` *(integer, optional, default: 5)*: Number of rows to fetch as preview.
+* **Example prompt:** `"Summarize the spreadsheets '1aBc...', '1dEf...', and '1gHi...'."`
+
+#### `read_google_sheet` *(Backward Compatibility)*
+Reads range values from the default configured spreadsheet.
+* **Parameters:**
+  * `range` *(string, required)*: A1 notation range.
 
 ---
 
-### 6. `create_sheet_tab`
+### ✍️ 4. Writing & Formatting Data
 
-Creates a new tab inside the Google Spreadsheet.
+#### `update_cells`
+Writes a 2D array of values directly to a specific range (overwrites existing values).
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Tab name.
+  * `range` *(string, required)*: A1 range (e.g. `'A1:B2'`).
+  * `data` *(2D array, required)*: Array of arrays (e.g. `[[1, 2], [3, 4]]`).
+* **Example prompt:** `"Put the numbers 10, 20 in Row 2, columns A and B of tab 'Metrics'."`
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `title` | string | ✅ | Name of the new tab (e.g., `'Q2 Reports'`) |
+#### `batch_update_cells`
+Writes values to multiple non-contiguous ranges/tabs in a single API call.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Tab name.
+  * `ranges` *(object, required)*: Dictionary mapping A1 ranges to 2D arrays (e.g. `{ "A1:B2": [[1,2],[3,4]], "D5": [["Hello"]] }`).
+* **Example prompt:** `"Write 'John' to A1, 'Doe' to B1, and 'Manager' to E5 in the 'Staff' sheet."`
 
-**Example prompt:**
-> *"Create a new sheet tab called 'Backlog Items'."*
+#### `update_google_sheet` *(Backward Compatibility)*
+Appends/updates a single row of values inside the default spreadsheet.
+* **Parameters:**
+  * `range` *(string, required)*: A1 range.
+  * `values` *(string[])*: Array of string values.
+
+#### `format_google_sheet` *(Backward Compatibility)*
+Sets font family (e.g. `'Inter'`) for a range of cells in the default spreadsheet.
+* **Parameters:**
+  * `fontFamily` *(string, required)*: Font name.
+  * `sheetId` *(integer)*, `startRowIndex` *(integer)*, `endRowIndex` *(integer)*, `startColumnIndex` *(integer)*, `endColumnIndex` *(integer)*.
+
+---
+
+### 📊 5. Row & Column Management
+
+#### `add_rows`
+Inserts empty rows at a specific index.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Tab name.
+  * `count` *(integer, required)*: Number of empty rows to insert.
+  * `start_row` *(integer, optional, default: 0)*: 0-based row index to start inserting.
+* **Example prompt:** `"Insert 10 empty rows starting at row 5 in sheet 'Logs'."`
+
+#### `add_columns`
+Inserts empty columns at a specific index.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Tab name.
+  * `count` *(integer, required)*: Number of empty columns to insert.
+  * `start_column` *(integer, optional, default: 0)*: 0-based column index to start inserting.
+* **Example prompt:** `"Insert 3 empty columns starting at column D (index 3) in sheet 'Report'."`
+
+---
+
+### 🚦 6. Data Validation
+
+#### `add_dropdown_validation` *(Backward Compatibility)*
+Applies data validation dropdown list constraints to a column range.
+* **Parameters:**
+  * `columnIndex` *(integer, required)*: 0-based column index.
+  * `options` *(string[], required)*: List of options.
+  * `sheetId` *(integer)*, `startRowIndex` *(integer)*, `endRowIndex` *(integer)*.
+* **Example prompt:** `"Make a dropdown in Column C with options: 'Paid', 'Unpaid'."`
+
+#### `remove_dropdown_validation` *(Backward Compatibility)*
+Clears dropdown rules from a column.
+* **Parameters:**
+  * `columnIndex` *(integer, required)*: 0-based column index.
+  * `sheetId` *(integer)*, `startRowIndex` *(integer)*, `endRowIndex` *(integer)*.
+
+---
+
+### 📈 7. Visualizations
+
+#### `add_chart`
+Creates and embeds a beautiful chart (column, bar, line, pie, etc.) directly into a spreadsheet tab.
+* **Parameters:**
+  * `spreadsheet_id` *(string, optional)*: Target spreadsheet ID.
+  * `sheet` *(string, required)*: Name of the sheet containing data.
+  * `chart_type` *(string, required)*: Chart type (`COLUMN`, `BAR`, `LINE`, `AREA`, `PIE`, `SCATTER`, `COMBO`, `HISTOGRAM`).
+  * `data_range` *(string, required)*: A1 range (e.g. `'A1:C10'`). The first row is treated as headers, first column as categories (X-axis).
+  * `title` *(string, optional)*: Chart title.
+  * `x_axis_label` *(string, optional)*: X-axis title.
+  * `y_axis_label` *(string, optional)*: Y-axis title.
+  * `position_x` / `position_y` *(integer, optional)*: Placement offsets.
+  * `width` / `height` *(integer, optional)*: Chart dimensions.
+* **Example prompt:** `"Create a COLUMN chart in 'Sales' using data from A1:B12. Title it '2026 Monthly Revenue', label X-axis as 'Months' and Y-axis as 'Earnings'."`
 
 ---
 
