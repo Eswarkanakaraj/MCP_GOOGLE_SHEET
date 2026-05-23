@@ -10,6 +10,8 @@ const { google } = require("googleapis");
 const fs = require("fs");
 const path = require("path");
 
+
+
 // Parse .env manually
 const envPath = path.join(__dirname, ".env");
 const envContent = fs.readFileSync(envPath, "utf-8");
@@ -30,13 +32,31 @@ envContent.split("\n").forEach((line) => {
 const CLIENT_ID = env.client_id;
 const CLIENT_SECRET = env.client_secret;
 const REDIRECT_URI = env.redirect_uris 
-const SPREADSHEET_ID =
-  env.sheet_id 
 const oAuth2Client = new google.auth.OAuth2(
   CLIENT_ID,
   CLIENT_SECRET,
   REDIRECT_URI,
 );
+
+// Automatically update .env when Google refreshes the access token
+oAuth2Client.on("tokens", (tokens) => {
+  let newEnv = fs.readFileSync(envPath, "utf-8");
+  if (tokens.access_token) {
+    if (newEnv.match(/access_token\s*=.*/)) {
+      newEnv = newEnv.replace(/access_token\s*=.*/, `access_token=${tokens.access_token}`);
+    } else {
+      newEnv += `\naccess_token=${tokens.access_token}`;
+    }
+  }
+  if (tokens.refresh_token) {
+    if (newEnv.match(/refresh_token\s*=.*/)) {
+      newEnv = newEnv.replace(/refresh_token\s*=.*/, `refresh_token=${tokens.refresh_token}`);
+    } else {
+      newEnv += `\nrefresh_token=${tokens.refresh_token}`;
+    }
+  }
+  fs.writeFileSync(envPath, newEnv);
+});
 
 if (env.refresh_token && env.access_token) {
   oAuth2Client.setCredentials({
@@ -250,15 +270,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       const CLIENT_ID = env.client_id;
       const CLIENT_SECRET = env.client_secret;
-      const REDIRECT_URI = env.redirect_uris || "http://localhost";
-      const SPREADSHEET_ID =
-        env.sheet_id || "1gCZhHSR-WcofTcaf9nbNYLURRmuEGXnj4BzDulHjWAs";
+      const REDIRECT_URI = env.redirect_uris;
+      const SPREADSHEET_ID = env.sheet_id;
 
       const oAuth2Client = new google.auth.OAuth2(
         CLIENT_ID,
         CLIENT_SECRET,
         REDIRECT_URI,
       );
+
+      // Automatically update .env dynamically when token refreshes during tool execution
+      oAuth2Client.on("tokens", (tokens) => {
+        let newEnv = fs.readFileSync(envPath, "utf-8");
+        if (tokens.access_token) {
+          if (newEnv.match(/access_token\s*=.*/)) {
+            newEnv = newEnv.replace(/access_token\s*=.*/, `access_token=${tokens.access_token}`);
+          } else {
+            newEnv += `\naccess_token=${tokens.access_token}`;
+          }
+        }
+        if (tokens.refresh_token) {
+          if (newEnv.match(/refresh_token\s*=.*/)) {
+            newEnv = newEnv.replace(/refresh_token\s*=.*/, `refresh_token=${tokens.refresh_token}`);
+          } else {
+            newEnv += `\nrefresh_token=${tokens.refresh_token}`;
+          }
+        }
+        fs.writeFileSync(envPath, newEnv);
+      });
+
       if (env.refresh_token && env.access_token) {
         oAuth2Client.setCredentials({
           access_token: env.access_token,

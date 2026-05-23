@@ -1,100 +1,194 @@
+# 📊 Google Sheets MCP Server
 
-Hurray!!!!
+A powerful **Model Context Protocol (MCP)** server that connects any AI assistant to Google Sheets. Read, write, format, and manage your spreadsheets using natural language — no manual API calls, no code changes, no token headaches.
 
-# Google Sheets MCP Server Documentation 📊🤖
+> **Built with Node.js** · Uses Google Sheets API v4 · OAuth 2.0 with automatic token refresh
 
-This document provides a complete, step-by-step guide to how our Model Context Protocol (MCP) connection works, how to configure Google Cloud credentials, and how to manage the synchronization between your AI assistant and Google Sheets.
+---
 
+## ✨ Features
 
+| Feature | Description |
+|---|---|
+| 📖 **Read Data** | Read any range of cells from any sheet tab |
+| ✏️ **Write Data** | Insert or update rows using A1 notation |
+| 🎨 **Format Cells** | Apply font families across any cell range |
+| 📋 **Dropdown Validation** | Add data validation dropdowns to columns |
+| 🗑️ **Remove Validation** | Remove dropdown rules from columns |
+| ➕ **Create Tabs** | Create new sheet tabs inside your spreadsheet |
+| 🔄 **Auto Token Refresh** | Access tokens refresh automatically — zero manual work |
 
 ---
 
 ## 🏛️ Architecture Overview
 
-```
-+-------------------+       MCP Protocol        +--------------------+       Google OAuth2       +-------------------+
-|                   |   (mcp_config.json)   |                    |    (Dynamic .env load)    |                   |
-|   AI Assistant    | <===================> |   mcp_server.js    | <=======================> |   Google Sheets   |
-|   (IDE Editor)    |                       |   (Node.js Server) |                           |        API        |
-+-------------------+                           +--------------------+                           +-------------------+
+```mermaid
+graph LR
+    A["🤖 AI Assistant<br/>(Claude, Gemini, etc.)"] -->|MCP Protocol<br/>stdio| B["⚙️ mcp_server.js<br/>(Node.js)"]
+    B -->|Google Sheets API v4<br/>OAuth 2.0| C["📊 Google Sheets"]
+    B -->|Auto-refresh writes| D[".env File<br/>(tokens stored)"]
+    D -->|Reads credentials| B
+
+    style A fill:#6366f1,stroke:#4f46e5,color:#fff
+    style B fill:#f59e0b,stroke:#d97706,color:#fff
+    style C fill:#10b981,stroke:#059669,color:#fff
+    style D fill:#8b5cf6,stroke:#7c3aed,color:#fff
 ```
 
-The system operates via a local Node.js MCP server (`mcp_server.js`). When you prompt the AI in your editor (e.g., *"Add task 16.1 to the sheet"*), the AI invokes the registered MCP tool. The MCP server dynamically reads your OAuth credentials from `.env` and pushes the data to Google Sheets via the official Google Sheets API.
+**How it works:** Your AI assistant communicates with `mcp_server.js` via the MCP protocol over stdio. The server authenticates with Google using OAuth 2.0 credentials from your `.env` file and executes operations on your Google Sheet. When tokens expire, they are refreshed automatically and saved back to `.env`.
 
 ---
 
-## 🛠️ Step 1: Google Cloud Setup & API Enabling
+## 📁 Project Structure
 
-To allow the MCP server to interact with your Google Sheet, you must configure a project in Google Cloud Console.
+```
+MCP_GOOGLE_SHEET/
+├── mcp_server.js          # Main MCP server — registers tools & handles requests
+├── generate_token.js      # One-time OAuth helper — generates initial tokens
+├── .env                   # Your credentials & tokens (never committed to git)
+├── .env.example           # Template for new users
+├── .gitignore             # Ensures .env stays private
+├── package.json           # Node.js dependencies
+└── README.md              # This file
+```
 
-### 1. Enable the Google Sheets API
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** v18 or higher
+- A **Google Cloud** account
+- A **Google Sheet** you want to control
+
+---
+
+### Step 1: Clone & Install
+
+```bash
+git clone https://github.com/Eswarkanakaraj/MCP_GOOGLE_SHEET.git
+cd MCP_GOOGLE_SHEET
+npm install
+```
+
+---
+
+### Step 2: Google Cloud Setup
+
+You need to create OAuth 2.0 credentials in the Google Cloud Console so the server can access your Google Sheets.
+
+#### 2.1 — Create a Google Cloud Project
+
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project (e.g., `ERP Sheet Sync`).
-3. Navigate to **APIs & Services > Library**.
-4. Search for **Google Sheets API** and click **Enable**.
+2. Click **Select a Project** → **New Project**.
+3. Name it (e.g., `MCP Sheet Sync`) and click **Create**.
 
-### 2. Configure OAuth Consent Screen
-1. Go to **APIs & Services > OAuth Consent Screen**.
-2. Select **External** (or Internal if using Google Workspace) and click **Create**.
-3. Fill in the App Name (e.g., `MCP Sheet Sync`) and User Support Email.
+#### 2.2 — Enable the Google Sheets API
+
+1. In your new project, navigate to **APIs & Services → Library**.
+2. Search for **Google Sheets API**.
+3. Click **Enable**.
+
+#### 2.3 — Configure OAuth Consent Screen
+
+1. Go to **APIs & Services → OAuth Consent Screen**.
+2. Select **External** and click **Create**.
+3. Fill in the required fields:
+   - **App Name**: `MCP Sheet Sync`
+   - **User Support Email**: Your email
 4. Under **Scopes**, click **Add or Remove Scopes** and add:
-   * `https://www.googleapis.com/auth/spreadsheets` (Full control over spreadsheets).
-5. Add your personal Google email address under **Test Users** so you can authorize the app during testing.
+   ```
+   https://www.googleapis.com/auth/spreadsheets
+   ```
+5. Under **Test Users**, add your own Google email.
+6. Click **Save and Continue**.
 
-### 3. Create OAuth Client Credentials
-1. Go to **APIs & Services > Credentials**.
-2. Click **Create Credentials > OAuth client ID**.
-3. Application Type: Select **Web application** (or Desktop app).
+> **💡 Important:** If you want tokens that never expire, click **PUBLISH APP** on the OAuth Consent Screen to move from "Testing" to "In Production". In Testing mode, refresh tokens expire after 7 days.
+
+#### 2.4 — Create OAuth Client Credentials
+
+1. Go to **APIs & Services → Credentials**.
+2. Click **Create Credentials → OAuth client ID**.
+3. Application Type: **Web application**.
 4. Name: `MCP Sheet Sync Client`.
 5. Under **Authorized redirect URIs**, add:
-   * `http://localhost`
-   * `https://developers.google.com/oauthplayground` (Optional, if using OAuth Playground for initial tokens).
-6. Click **Create**. You will receive your **Client ID** and **Client Secret**.
+   ```
+   http://localhost:3000/oauth2callback
+   ```
+6. Click **Create**.
+7. Copy your **Client ID** and **Client Secret**.
 
 ---
 
-## 🔑 Step 2: Generating Refresh & Access Tokens
+### Step 3: Configure `.env`
 
-To keep the AI connected permanently without requiring login every time, we use an **Offline Refresh Token**.
-
-### Method A: Using Google OAuth Playground (Fastest)
-1. Go to [Google OAuth 2.0 Playground](https://developers.google.com/oauthplayground/).
-2. Click the Gear icon ⚙️ (Top Right) > check **Use your own OAuth credentials**.
-3. Paste your OAuth **Client ID** and **Client Secret**.
-4. In Step 1 (Select & authorize APIs), input the scope:
-   `https://www.googleapis.com/auth/spreadsheets`
-5. Click **Authorize APIs** and log in with your Google account.
-6. In Step 2, click **Exchange authorization code for tokens**.
-7. Copy the resulting `refresh_token` and `access_token`.
-
----
-
-## 📁 Step 3: Project Configuration (`.env`)
-
-Inside your local folder (`d:\Shrewd\Ceezet\google-sheet-sync\`), maintain a `.env` file containing your credentials. 
+Create a `.env` file in the project root with your credentials:
 
 ```env
-client_id=YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com
-client_secret=YOUR_GOOGLE_CLIENT_SECRET
-redirect_uris=http://localhost
-sheet_id=1gCZhHSR-WcofTcaf9nbNYLURRmuEGXnj4BzDulHjWAs
-refresh_token=1//0g_YOUR_LONG_REFRESH_TOKEN_HERE
-access_token=ya29.a0AfB_YOUR_CURRENT_ACCESS_TOKEN_HERE
+client_id=YOUR_CLIENT_ID.apps.googleusercontent.com
+client_secret=YOUR_CLIENT_SECRET
+sheet_id=YOUR_GOOGLE_SHEET_ID
 ```
 
-> 📌 **Note on Dynamic Refresh**: The script `mcp_server.js` dynamically parses this `.env` file on every single tool call. If the access token expires, Google's OAuth library automatically uses the `refresh_token` to get a new one behind the scenes.
+> **💡 How to find your Sheet ID:** Open your Google Sheet in the browser. The URL looks like:
+> `https://docs.google.com/spreadsheets/d/`**`1gCZhHSR-WcofTcaf9nbNYLURRmuEGXnj4BzDulHjWAs`**`/edit`
+> The bold part is your `sheet_id`.
+---
+
+### Step 4: Generate Your Tokens (One-Time Setup)
+
+Run the token generator script:
+
+```bash
+node generate_token.js
+```
+
+**What happens:**
+
+```mermaid
+sequenceDiagram
+    participant U as 👤 You
+    participant S as 🖥️ generate_token.js
+    participant G as 🔐 Google OAuth
+
+    U->>S: Run "node generate_token.js"
+    S->>S: Read client_id & client_secret from .env
+    S->>U: Print authorization URL in terminal
+    U->>G: Click URL → Log in → Click "Allow"
+    G->>S: Redirect to localhost:3000 with auth code
+    S->>G: Exchange auth code for tokens
+    G->>S: Return access_token + refresh_token
+    S->>S: Save tokens to .env automatically
+    S->>U: Print tokens in terminal ✅
+    Note over S: Server shuts down automatically
+```
+
+1. The script prints a URL in your terminal.
+2. Click the URL (or copy-paste into your browser).
+3. Log in with your Google account and click **"Allow"**.
+4. The script automatically catches the callback, fetches your tokens, saves them to `.env`, and prints them in the console.
+5. **Done!** You never need to run this script again (unless you revoke access).
+
+After running, your `.env` will look like this:
+
+```env
+client_id=452139...apps.googleusercontent.com
+client_secret=GOCSPX-...
+sheet_id=1gCZhHSR-...
+refresh_token=1//0gzqB9...
+access_token=ya29.a0AQvPy...
+```
 
 ---
 
-## 🔌 Step 4: MCP Server Registration in IDE
+### Step 5: Register the MCP Server
 
-To connect the AI assistant to this local server, you must register it in your AI assistant's global configuration file.
+Add the server to your AI assistant's MCP configuration file.
 
-### Configuration File Location
-* **Windows**: `C:\Users\front\.gemini\antigravity\mcp_config.json`
+#### For Claude Desktop
 
-### JSON Configuration Block
-Add the following configuration inside the `"mcpServers"` object:
+Edit `claude_desktop_config.json`:
 
 ```json
 {
@@ -102,101 +196,233 @@ Add the following configuration inside the `"mcpServers"` object:
     "GoogleSheetsSync": {
       "command": "node",
       "args": [
-        "your mcp_server.js path"
-      ],
-      "env": {}
+        "C:/path/to/MCP_GOOGLE_SHEET/mcp_server.js"
+      ]
     }
   }
 }
 ```
 
----
+#### For Gemini / Antigravity IDE
 
-## 🎮 How to Use & Manage the Connection
+Edit `mcp_config.json`:
 
-### 1. Pushing Updates via AI Prompting
-You do not need markdown files. Simply give natural language commands in your chat box:
-> *"Add task 17.1: Completed User Profile page redesign under Authentication module. Mark Dev Status as Completed and Verification as Pending."*
+```json
+{
+  "mcpServers": {
+    "GoogleSheetsSync": {
+      "command": "node",
+      "args": [
+        "D:/path/to/MCP_GOOGLE_SHEET/mcp_server.js"
+      ]
+    }
+  }
+}
+```
 
-The AI will automatically format this into your 9-column sheet schema and trigger the `update_google_sheet` tool.
-
-### 2. Backfilling Dropdowns (Data Validation)
-If your Google Sheet has Data Validation dropdowns (e.g., Column J and K), simply instruct the AI to pass the exact matching text (e.g., `"Completed"`, `"Pending"`). Google Sheets automatically renders them as beautifully colored status pills.
-
-### 3. How to Disconnect / Stop the Service
-If you ever want to pause the sync or revoke AI access to your Google Sheet:
-1. Open `C:\Users\front\.gemini\antigravity\mcp_config.json`.
-2. Delete or comment out the `"GoogleSheetsSync"` block and save the file.
-3. The background server stops immediately, ensuring your spreadsheet is 100% private and disconnected. To reconnect, simply paste the block back in.
-
----
-
-## 📐 Handling Sheet Design Changes (Schema Flexibility)
-
-The MCP server setup (`mcp_server.js`) is intentionally **schema-agnostic**. It does not strictly lock you into the 9-column design. Here is how it handles changes to your sheet's design (e.g., adding columns, moving dropdowns, or adding tabs):
-
-### 1. Basic Data Updates (`update_google_sheet`)
-If you add more columns (e.g., expanding from 9 to 12 columns), **you do not need to change `mcp_server.js` at all.** 
-* **How it works:** The tool dynamically accepts a `range` (like `'Sheet1!A2:L2'`) and an array of `values`. 
-* **What you do:** Just tell the AI in your prompt, *"I added 3 new columns at the end."* The AI will automatically adjust the range and the data it sends to the server.
-
-### 2. Header Rows & Dropdowns (`add_dropdown_validation`)
-If you change how many header rows are at the top of your sheet, you *might* need to adjust `mcp_server.js`.
-* **Current Server Design:** The `add_dropdown_validation` tool has a default of `startRowIndex: 2`, which assumes your data starts on **Row 3** (indexes are 0-based).
-* **What you do:** If your headers only take up 1 row, you can either instruct the AI to always pass `startRowIndex: 1`, OR manually change the default in `mcp_server.js`. *(Similarly, `remove_dropdown_validation` defaults to `startRowIndex: 56`).*
-
-### 3. Total Column Limit (`format_google_sheet`)
-If your sheet expands to a massive amount of columns (beyond column 'Z'):
-* **Current Server Design:** The formatting tool defaults to `endColumnIndex: 26` (formatting columns A through Z). 
-* **What you do:** If your sheet grows beyond column Z, change the default `endColumnIndex` to something higher (e.g., `50`) in `mcp_server.js`, or ensure the AI explicitly passes that number when calling the formatting tool.
-
-### 4. Multiple Sheet Tabs (`sheetId`)
-If you redesign your workflow to use multiple tabs (e.g., "Tasks", "Users"):
-* **Current Server Design:** Formatting and dropdown tools default to `sheetId: 0` (the first tab created in the document). 
-* **What you do:** Instruct the AI to explicitly pass the specific `sheetId` (e.g., `123456789`) for the new tabs when requesting dropdowns or formatting, otherwise operations will default to the first tab.
-
-**Summary:** To adapt to a new sheet design, you rarely need to modify the server code. Simply inform the AI of your new column layout in your prompt, and it will dynamically map your request to the flexible tools provided by `mcp_server.js`.
+> **📌 Note:** Replace the path with the actual absolute path to `mcp_server.js` on your machine.
 
 ---
 
-## 💡 Prompt Engineering & Optimization Tips
+## 🔄 How Automatic Token Refresh Works
 
-To get the absolute best results from your AI assistant when using this Google Sheet sync tool, you can leverage detailed prompts. The AI will interpret your design intentions and call the appropriate MCP tools sequentially.
+This is the key feature that makes this server zero-maintenance after the initial setup.
 
-Here are highly optimized prompt templates you can copy and customize:
+```mermaid
+flowchart TD
+    A["AI triggers a tool<br/>(e.g., read_google_sheet)"] --> B{"Is access_token<br/>expired?"}
+    B -->|No| C["✅ Execute API call<br/>Return results to AI"]
+    B -->|Yes| D["Google OAuth library<br/>uses refresh_token to<br/>get a new access_token"]
+    D --> E["🔄 'tokens' event fires<br/>in mcp_server.js"]
+    E --> F["New tokens are written<br/>to .env automatically"]
+    F --> C
 
-### 1. The "Design Realignment" Prompt (When your sheet layout changes)
-If you add columns, change headers, or change colors, tell the AI exactly what the new layout looks like in a single structured prompt:
-> *"I have redesigned my Google Sheet tab named 'Tasks'. Here is the new layout:
-> * Column A: Task ID
-> * Column B: Module Name
-> * Column C: Task Description
-> * Column D: Dev Status (Dropdown: 'Not Started', 'In Progress', 'Completed')
-> * Column E: Verification (Dropdown: 'Pending', 'Verified')
-> * Column F: Date Updated
-> 
-> Row 1 is a title row. Row 2 contains these headers. All actual data starts on Row 3. Please keep this structure in mind for all future updates to this tab."*
+    style A fill:#6366f1,stroke:#4f46e5,color:#fff
+    style B fill:#f59e0b,stroke:#d97706,color:#fff
+    style C fill:#10b981,stroke:#059669,color:#fff
+    style D fill:#ef4444,stroke:#dc2626,color:#fff
+    style E fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style F fill:#06b6d4,stroke:#0891b2,color:#fff
+```
 
-### 2. The "Aesthetic Polish" Prompt (Bulk Formatting)
-To format your sheet to look extremely professional using Google-supported clean typography (like `Inter`, `Roboto`, or `Montserrat`):
-> *"Format the 'Tasks' sheet to look clean and modern. Set the font family to 'Inter' for all columns from A to F, starting from row 1 to 500. Additionally, apply data validation dropdowns to Column D (Dev Status) with ['Not Started', 'In Progress', 'Completed'] and Column E (Verification) with ['Pending', 'Verified'] starting from Row 3."*
+### What this means for you:
 
-### 3. The "Smart Data Insertion" Prompt
-When adding data, instruct the AI to calculate or format specific fields (like dates or status pills) automatically:
-> *"Add a new task: 'Implement JWT login verification' under the 'Auth' module. Mark its status as 'In Progress' and verification as 'Pending'. Set today's date in Column F. Make sure to find the first empty row in the 'Tasks' sheet to insert this, and format the row's text font to 'Inter'."*
-
-### 4. The "Bulk Import / Migration" Prompt
-If you have a block of tasks or a markdown table you want to sync at once:
-> *"I have a list of 5 tasks below. For each task, find the next empty row starting from row 3 on the sheet and sync them one by one. Use the exact status text 'Not Started' so the dropdown validation doesn't break:
-> 1. Design signup UI
-> 2. Create database migration for users
-> 3. Set up email confirmation template
-> 4. Write validation middleware
-> 5. Create logout endpoint"*
+| Scenario | What happens | Action required |
+|---|---|---|
+| Access token expires (every ~1 hour) | Server silently refreshes it using `refresh_token` and saves the new token to `.env` | **None** ✅ |
+| Refresh token is valid | Google issues a new access token whenever needed | **None** ✅ |
+| App is published in Google Cloud | Refresh token **never expires** | **None** ✅ |
+| App is in Testing mode | Refresh token expires after 7 days | Re-run `node generate_token.js` |
+| You revoke access from Google Account | All tokens become invalid | Re-run `node generate_token.js` |
 
 ---
 
-### 🚀 Optimization Best Practices
-* **Provide Column Mappings:** The AI is smart, but explicitly mapping columns (e.g. *"Column C is Description"*) prevents errors.
-* **Keep Dropdowns Exact:** Ensure that the text you ask the AI to insert matches your Sheet's data validation list *exactly* (case-sensitive) so Google Sheets displays the colored status pill correctly.
-* **Specify Tab Names:** If your Google Sheet contains multiple tabs, always mention the specific tab name (e.g. *"'Tasks' tab"*) in your prompts so the AI knows where to write.
+## 🧰 Available MCP Tools
+
+### 1. `read_google_sheet`
+
+Reads cell values from any range in the spreadsheet.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `range` | string | ✅ | A1 notation (e.g., `'Sheet1!A1:Z100'`) |
+
+**Example prompt:**
+> *"Read all data from Sheet1, rows 1 to 50."*
+
+---
+
+### 2. `update_google_sheet`
+
+Writes values to a specific range in the spreadsheet.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `range` | string | ✅ | A1 notation (e.g., `'Sheet1!A2:C2'`) |
+| `values` | string[] | ✅ | Array of values (e.g., `['Task 1', 'Done', '2026-05-23']`) |
+
+**Example prompt:**
+> *"Add a new row: Task ID 101, Module 'Auth', Status 'In Progress' to Sheet1 row 15."*
+
+---
+
+### 3. `format_google_sheet`
+
+Applies font formatting across a range of cells.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `fontFamily` | string | ✅ | — | Font name (e.g., `'Inter'`, `'Roboto'`) |
+| `sheetId` | integer | ❌ | `0` | Sheet tab ID |
+| `startRowIndex` | integer | ❌ | `0` | Start row (0-based) |
+| `endRowIndex` | integer | ❌ | `1000` | End row (exclusive) |
+| `startColumnIndex` | integer | ❌ | `0` | Start column (0-based) |
+| `endColumnIndex` | integer | ❌ | `26` | End column (exclusive) |
+
+**Example prompt:**
+> *"Set the font to 'Inter' for the entire Tasks sheet."*
+
+---
+
+### 4. `add_dropdown_validation`
+
+Adds a data validation dropdown (select list) to a column.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `columnIndex` | integer | ✅ | — | 0-based column index (e.g., `3` for column D) |
+| `options` | string[] | ✅ | — | Allowed values (e.g., `['Pending', 'Done']`) |
+| `sheetId` | integer | ❌ | `0` | Sheet tab ID |
+| `startRowIndex` | integer | ❌ | `2` | Start row (0-based) |
+| `endRowIndex` | integer | ❌ | `1000` | End row (exclusive) |
+
+**Example prompt:**
+> *"Add a dropdown to column D with options: 'Not Started', 'In Progress', 'Completed' — starting from row 3."*
+
+---
+
+### 5. `remove_dropdown_validation`
+
+Removes data validation rules from a column.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `columnIndex` | integer | ✅ | — | 0-based column index |
+| `sheetId` | integer | ❌ | `0` | Sheet tab ID |
+| `startRowIndex` | integer | ❌ | `56` | Start row (0-based) |
+| `endRowIndex` | integer | ❌ | `1000` | End row (exclusive) |
+
+**Example prompt:**
+> *"Remove the dropdown validation from column H."*
+
+---
+
+### 6. `create_sheet_tab`
+
+Creates a new tab inside the Google Spreadsheet.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | ✅ | Name of the new tab (e.g., `'Q2 Reports'`) |
+
+**Example prompt:**
+> *"Create a new sheet tab called 'Backlog Items'."*
+
+---
+
+## 📐 Schema Flexibility
+
+The MCP server is **schema-agnostic** — it does not enforce any specific column layout. This means:
+
+- ✅ You can add, remove, or reorder columns without changing `mcp_server.js`
+- ✅ You can have any number of sheet tabs
+- ✅ You can use any column as a dropdown
+- ✅ Just describe your sheet layout to the AI in your prompt and it adapts
+
+---
+
+## 💡 Prompt Engineering Tips
+
+### 1. Describe Your Layout Once
+
+Give the AI your column mapping so it knows where to write:
+
+> *"My sheet has: Column A = Task ID, Column B = Module, Column C = Description, Column D = Status (dropdown: 'Not Started', 'In Progress', 'Completed'), Column E = Date. Data starts on Row 3."*
+
+### 2. Bulk Insert
+
+> *"Add these 5 tasks starting from the next empty row:*
+> *1. Design login page*
+> *2. Create user database*
+> *3. Set up email templates*
+> *4. Write API validation*
+> *5. Build logout flow*
+> *Mark all as 'Not Started' and use today's date."*
+
+### 3. Format & Style
+
+> *"Format the entire 'Tasks' sheet with font 'Inter'. Then add dropdown validation to Column D with ['Not Started', 'In Progress', 'Completed'] and Column E with ['Pending', 'Verified'] starting from Row 3."*
+
+### 4. Read & Analyze
+
+> *"Read all data from the Tasks sheet and tell me how many tasks are marked as 'Completed'."*
+
+---
+
+## 🔒 Security
+
+- 🔐 Your `.env` file containing all secrets is listed in `.gitignore` — it is **never** pushed to GitHub
+- 🔑 OAuth tokens are stored locally on your machine only
+- 🛡️ The server runs locally via stdio — no external network ports are exposed during normal MCP operation
+- ♻️ Access tokens expire every hour and are refreshed automatically
+
+---
+
+## 🐛 Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `Missing refresh_token or access_token in .env` | Run `node generate_token.js` to generate tokens |
+| `Error: invalid_grant` | Your refresh token expired. Re-run `node generate_token.js` |
+| `Error: Token has been expired or revoked` | Re-run `node generate_token.js`. Consider publishing your app in Google Cloud to prevent expiry |
+| Tokens keep expiring every 7 days | Your Google Cloud app is in "Testing" mode. Go to OAuth Consent Screen → click **PUBLISH APP** |
+| `Port 3000 already in use` | Another process is using port 3000. Kill it with `npx kill-port 3000` or close the other terminal |
+| MCP server not showing in AI assistant | Double-check the path in `mcp_config.json` and restart your AI assistant |
+
+---
+
+## 📄 License
+
+MIT License — feel free to use, modify, and distribute.
+
+---
+
+## 🙌 Contributing
+
+Pull requests are welcome! If you have ideas for new tools (e.g., cell coloring, conditional formatting, chart creation), feel free to open an issue or submit a PR.
+
+---
+
+<p align="center">
+  Built with ❤️ by <a href="https://github.com/Eswarkanakaraj">Eswarkanakaraj</a>
+</p>
