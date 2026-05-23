@@ -350,6 +350,298 @@ Creates a new tab inside the Google Spreadsheet.
 
 ---
 
+## 🧠 How It Actually Works (For Beginners)
+
+If you are completely new to MCP, OAuth, or APIs — this section will explain everything from scratch.
+
+### What is MCP?
+
+**MCP (Model Context Protocol)** is a standard that lets AI assistants (like Claude, Gemini, etc.) call external tools. Think of it like giving your AI a set of superpowers:
+
+```mermaid
+graph LR
+    A["You say:<br/>'Read my Google Sheet'"] --> B["AI Assistant<br/>(understands your intent)"]
+    B --> C["AI calls the tool:<br/>read_google_sheet"]
+    C --> D["mcp_server.js<br/>(executes the API call)"]
+    D --> E["Google Sheets API<br/>(returns the data)"]
+    E --> D
+    D --> C
+    C --> B
+    B --> F["AI replies:<br/>'Here are your 50 rows...'"]
+
+    style A fill:#6366f1,stroke:#4f46e5,color:#fff
+    style B fill:#f59e0b,stroke:#d97706,color:#fff
+    style C fill:#ec4899,stroke:#db2777,color:#fff
+    style D fill:#10b981,stroke:#059669,color:#fff
+    style E fill:#06b6d4,stroke:#0891b2,color:#fff
+    style F fill:#8b5cf6,stroke:#7c3aed,color:#fff
+```
+
+Without MCP, the AI can only chat with you. With MCP, the AI can **do things** — like reading your spreadsheet, updating cells, or creating tabs.
+
+### What is OAuth 2.0?
+
+Google doesn't allow random apps to access your spreadsheets. You need **permission**. OAuth 2.0 is Google's permission system:
+
+| Concept | Real-World Analogy |
+|---|---|
+| **Client ID** | Your app's ID card — tells Google "who is asking" |
+| **Client Secret** | Your app's password — proves it's really your app |
+| **Access Token** | A temporary visitor pass — expires every ~1 hour |
+| **Refresh Token** | A permanent master key — used to get new visitor passes forever |
+
+### Why Do We Need Two Tokens?
+
+```mermaid
+graph TD
+    A["🔑 Refresh Token<br/>(permanent master key)"] --> B["Creates new Access Tokens<br/>whenever they expire"]
+    B --> C["🎫 Access Token #1<br/>(expires in 1 hour)"]
+    B --> D["🎫 Access Token #2<br/>(expires in 1 hour)"]
+    B --> E["🎫 Access Token #3<br/>(expires in 1 hour)"]
+    B --> F["🎫 ...and so on, forever"]
+
+    C --> G["Used to call Google Sheets API"]
+    D --> G
+    E --> G
+
+    style A fill:#10b981,stroke:#059669,color:#fff
+    style C fill:#f59e0b,stroke:#d97706,color:#fff
+    style D fill:#f59e0b,stroke:#d97706,color:#fff
+    style E fill:#f59e0b,stroke:#d97706,color:#fff
+    style F fill:#94a3b8,stroke:#64748b,color:#fff
+    style G fill:#6366f1,stroke:#4f46e5,color:#fff
+```
+
+Google intentionally makes access tokens expire quickly for security. If someone steals your access token, it only works for 1 hour. But your refresh token can silently generate new access tokens forever — and our server does this **automatically**.
+
+### What Happens Inside `mcp_server.js`?
+
+Here is the complete lifecycle of a single request:
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 You (typing in AI chat)
+    participant AI as 🤖 AI Assistant
+    participant MCP as ⚙️ mcp_server.js
+    participant ENV as 📄 .env file
+    participant Google as 🌐 Google Sheets API
+
+    User->>AI: "Read row 5 from my Tasks sheet"
+    AI->>AI: Understands intent → decides to call read_google_sheet
+    AI->>MCP: Tool call: read_google_sheet(range: "Tasks!A5:Z5")
+
+    MCP->>ENV: Read .env → get client_id, client_secret, tokens, sheet_id
+    MCP->>MCP: Create OAuth2 client with credentials
+    MCP->>Google: GET spreadsheets.values.get("Tasks!A5:Z5")
+
+    alt Access Token is Valid
+        Google->>MCP: ✅ Returns row data
+    else Access Token Expired
+        Google->>MCP: ❌ 401 Unauthorized
+        MCP->>Google: Use refresh_token → request new access_token
+        Google->>MCP: ✅ New access_token issued
+        MCP->>ENV: 💾 Save new access_token to .env
+        MCP->>Google: Retry: GET spreadsheets.values.get("Tasks!A5:Z5")
+        Google->>MCP: ✅ Returns row data
+    end
+
+    MCP->>AI: Return data as JSON
+    AI->>User: "Here is row 5: Task ID 105, Module: Auth, Status: Completed..."
+```
+
+### What Does Each File Do?
+
+| File | Purpose | When does it run? |
+|---|---|---|
+| `mcp_server.js` | The main server. Registers 6 tools, handles every AI request, talks to Google, auto-refreshes tokens | Every time the AI uses a tool (runs continuously in the background) |
+| `generate_token.js` | Helper script. Opens a local web server, redirects you to Google login, catches the callback, saves tokens | **Only once** during initial setup (or if you revoke access) |
+| `.env` | Stores your credentials and tokens | Read by both scripts. Updated automatically when tokens refresh |
+| `.env.example` | Template showing what keys are needed | Never runs — just a reference for new users |
+
+---
+
+## 🔧 Customization Guide
+
+The 6 tools included in this project are designed for a specific use case (task tracking with dropdowns). But **you can easily add your own tools** or modify existing ones.
+
+### Understanding the Tool Structure
+
+Every tool in `mcp_server.js` has exactly 3 parts:
+
+```mermaid
+graph TD
+    A["1️⃣ Tool Registration<br/>(ListToolsRequestSchema)<br/>Tells the AI what tools exist"] --> B["2️⃣ Tool Handler<br/>(CallToolRequestSchema)<br/>Runs when AI calls the tool"]
+    B --> C["3️⃣ Google API Call<br/>Actually talks to Google Sheets"]
+
+    style A fill:#6366f1,stroke:#4f46e5,color:#fff
+    style B fill:#f59e0b,stroke:#d97706,color:#fff
+    style C fill:#10b981,stroke:#059669,color:#fff
+```
+
+### Example: Adding a New Tool — `delete_rows`
+
+Let's say you want a tool that **deletes rows** from your sheet. Here is exactly how to do it:
+
+**Step 1 — Register the tool** (inside the `ListToolsRequestSchema` handler, add to the `tools` array):
+
+```javascript
+{
+  name: "delete_rows",
+  description: "Deletes a range of rows from a Google Sheet tab.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      sheetId: {
+        type: "integer",
+        description: "The sheet tab ID. Default is 0 (first tab)."
+      },
+      startRowIndex: {
+        type: "integer",
+        description: "The starting row index (0-based). e.g., 4 means Row 5."
+      },
+      endRowIndex: {
+        type: "integer",
+        description: "The ending row index (exclusive). e.g., 7 deletes up to Row 7."
+      }
+    },
+    required: ["startRowIndex", "endRowIndex"]
+  }
+}
+```
+
+**Step 2 — Add the handler** (inside the `CallToolRequestSchema` handler):
+
+```javascript
+if (request.params.name === "delete_rows") {
+  const sheetId = request.params.arguments.sheetId || 0;
+  const startRowIndex = request.params.arguments.startRowIndex;
+  const endRowIndex = request.params.arguments.endRowIndex;
+
+  const requests = [
+    {
+      deleteDimension: {
+        range: {
+          sheetId: sheetId,
+          dimension: "ROWS",
+          startIndex: startRowIndex,
+          endIndex: endRowIndex,
+        },
+      },
+    },
+  ];
+
+  const result = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    resource: { requests },
+  });
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Success! Rows ${startRowIndex} to ${endRowIndex} deleted.`,
+      },
+    ],
+  };
+}
+```
+
+**Step 3 — Add the tool name to the request filter** (the `if` block at the top of `CallToolRequestSchema`):
+
+```javascript
+request.params.name === "delete_rows" ||
+```
+
+**That's it!** Restart your AI assistant and you can now say: *"Delete rows 10 to 15 from my Tasks sheet."*
+
+### Example: Adding a New Tool — `append_row`
+
+If you want a tool that automatically appends data to the **next empty row** (instead of specifying a range):
+
+```javascript
+// Registration:
+{
+  name: "append_row",
+  description: "Appends a new row of data to the end of a sheet.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      sheetName: {
+        type: "string",
+        description: "The sheet tab name. e.g., 'Sheet1'"
+      },
+      values: {
+        type: "array",
+        items: { type: "string" },
+        description: "Array of values to append as a new row."
+      }
+    },
+    required: ["sheetName", "values"]
+  }
+}
+
+// Handler:
+if (request.params.name === "append_row") {
+  const sheetName = request.params.arguments.sheetName;
+  const values = request.params.arguments.values;
+
+  const result = await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A1`,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    resource: { values: [values] },
+  });
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Success! Row appended to ${sheetName}.`,
+      },
+    ],
+  };
+}
+```
+
+### More Tool Ideas You Can Build
+
+| Tool Idea | Google Sheets API Method | Description |
+|---|---|---|
+| `bold_cells` | `batchUpdate` → `repeatCell` | Make text bold in a range |
+| `set_background_color` | `batchUpdate` → `repeatCell` | Change cell background color |
+| `merge_cells` | `batchUpdate` → `mergeCells` | Merge a range of cells |
+| `auto_resize_columns` | `batchUpdate` → `autoResizeDimensions` | Auto-fit column widths |
+| `protect_range` | `batchUpdate` → `addProtectedRange` | Lock cells from editing |
+| `get_sheet_metadata` | `spreadsheets.get` | Get all tab names and IDs |
+| `duplicate_sheet_tab` | `batchUpdate` → `duplicateSheet` | Clone a tab |
+| `sort_range` | `batchUpdate` → `sortRange` | Sort rows by a column |
+| `clear_range` | `spreadsheets.values.clear` | Clear all data in a range |
+| `find_and_replace` | `batchUpdate` → `findReplace` | Search and replace text |
+
+> **📖 Reference:** All available operations are documented in the [Google Sheets API Reference](https://developers.google.com/sheets/api/reference/rest).
+
+### Changing the Google API Scope
+
+If you want to extend this server beyond Google Sheets (e.g., Google Drive, Google Calendar), you need to:
+
+1. **Enable the additional API** in Google Cloud Console (APIs & Services → Library).
+2. **Update the scope** in `generate_token.js` (line 34):
+   ```javascript
+   // Current (Sheets only):
+   scope: ['https://www.googleapis.com/auth/spreadsheets'],
+
+   // Extended (Sheets + Drive):
+   scope: [
+     'https://www.googleapis.com/auth/spreadsheets',
+     'https://www.googleapis.com/auth/drive',
+   ],
+   ```
+3. **Re-run** `node generate_token.js` to get a new token with the expanded permissions.
+4. **Add new tool handlers** in `mcp_server.js` using the relevant Google API client (e.g., `google.drive({ version: 'v3', auth: oAuth2Client })`).
+
+---
+
 ## 📐 Schema Flexibility
 
 The MCP server is **schema-agnostic** — it does not enforce any specific column layout. This means:
