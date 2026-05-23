@@ -709,9 +709,44 @@ MIT License — feel free to use, modify, and distribute.
 
 ---
 
-## 🙌 Contributing
+## 🤝 Contributing
 
-Pull requests are welcome! If you have ideas for new tools (e.g., cell coloring, conditional formatting, chart creation), feel free to open an issue or submit a PR.
+Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**! 
+
+To contribute to this project, follow the standard **Fork & Pull Request** workflow:
+
+### 1. Fork the Project
+Click the **Fork** button at the top-right of this page to create a copy of this repository under your own GitHub account.
+
+### 2. Clone Your Fork
+Clone your forked repository to your local machine:
+```bash
+git clone https://github.com/YOUR_USERNAME/MCP_GOOGLE_SHEET.git
+cd MCP_GOOGLE_SHEET
+```
+
+### 3. Create a Feature Branch
+Create a new branch for your feature or bug fix:
+```bash
+git checkout -b feature/AmazingFeature
+```
+
+### 4. Make Changes & Commit
+Implement your feature, write tests if applicable, and commit your changes:
+```bash
+git commit -m "Add some AmazingFeature"
+```
+
+### 5. Push to Your Fork
+Push your new branch to your own GitHub repository:
+```bash
+git push origin feature/AmazingFeature
+```
+
+### 6. Open a Pull Request (PR)
+Go to the original `Eswarkanakaraj/MCP_GOOGLE_SHEET` repository on GitHub. You will see a banner prompting you to compare and open a **Pull Request**. Submit the PR detailing your changes!
+
+We will review your code, run tests, and merge your contribution as soon as possible! 🚀
 
 ---
 
