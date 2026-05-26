@@ -133,146 +133,6 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
-      // original tools retained for backwards compatibility
-      {
-        name: "update_google_sheet",
-        description: "Updates a row in a Google Sheet.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            range: {
-              type: "string",
-              description: "The A1 notation of the values to update. e.g., 'Sheet1!A2:C2'",
-            },
-            values: {
-              type: "array",
-              items: { type: "string" },
-              description: "Array of string values to insert into the cells. Example: ['100', 'Completed', 'Done']",
-            },
-          },
-          required: ["range", "values"],
-        },
-      },
-      {
-        name: "format_google_sheet",
-        description: "Updates formatting (e.g., font family) of cells in a Google Sheet.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            fontFamily: {
-              type: "string",
-              description: "The font family name to apply. e.g., 'Times New Roman'",
-            },
-            sheetId: {
-              type: "integer",
-              description: "The ID of the sheet tab. Default is 0.",
-            },
-            startRowIndex: {
-              type: "integer",
-              description: "Starting row index (0-based). Default is 0.",
-            },
-            endRowIndex: {
-              type: "integer",
-              description: "Ending row index (exclusive). Default is 1000.",
-            },
-            startColumnIndex: {
-              type: "integer",
-              description: "Starting column index. Default is 0.",
-            },
-            endColumnIndex: {
-              type: "integer",
-              description: "Ending column index. Default is 26.",
-            },
-          },
-          required: ["fontFamily"],
-        },
-      },
-      {
-        name: "add_dropdown_validation",
-        description: "Applies data validation dropdown rules to a specific column range in Google Sheets.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            sheetId: {
-              type: "integer",
-              description: "The ID of the sheet tab. Default is 0.",
-            },
-            startRowIndex: {
-              type: "integer",
-              description: "Starting row index (0-based). Default is 2 (Row 3).",
-            },
-            endRowIndex: {
-              type: "integer",
-              description: "Ending row index. Default is 1000.",
-            },
-            columnIndex: {
-              type: "integer",
-              description: "The 0-based column index to apply validation to (e.g., 3 for Column D).",
-            },
-            options: {
-              type: "array",
-              items: { type: "string" },
-              description: "Array of allowed string options. Example: ['Completed', 'Pending', 'In Progress']",
-            },
-          },
-          required: ["columnIndex", "options"],
-        },
-      },
-      {
-        name: "remove_dropdown_validation",
-        description: "Removes data validation rules from a specific column range in Google Sheets.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            sheetId: {
-              type: "integer",
-              description: "Sheet ID. Default is 0.",
-            },
-            startRowIndex: {
-              type: "integer",
-              description: "Starting row index (0-based). Default is 56.",
-            },
-            endRowIndex: {
-              type: "integer",
-              description: "Ending row index. Default is 1000.",
-            },
-            columnIndex: {
-              type: "integer",
-              description: "Column index to remove validation from.",
-            },
-          },
-          required: ["columnIndex"],
-        },
-      },
-      {
-        name: "create_sheet_tab",
-        description: "Creates a new sheet tab inside the Google Spreadsheet.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            title: {
-              type: "string",
-              description: "The title of the new sheet tab. e.g., 'Remarks Sheet 2'",
-            },
-          },
-          required: ["title"],
-        },
-      },
-      {
-        name: "read_google_sheet",
-        description: "Reads values from a Google Sheet.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            range: {
-              type: "string",
-              description: "The A1 notation of the values to read. e.g., 'Sheet1!A1:Z100'",
-            },
-          },
-          required: ["range"],
-        },
-      },
-      // NEW TOOLS AS REQUESTED
       {
         name: "list_spreadsheets",
         description: "Lists spreadsheets in the configured Drive folder or accessible by the user.",
@@ -305,6 +165,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "list_sheets",
+        description: "Lists all sheet/tab names within a spreadsheet.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            spreadsheet_id: {
+              type: "string",
+              description: "The spreadsheet ID. If omitted, uses the configured default.",
+            },
+          },
+        },
+      },
+      {
+        name: "create_sheet",
+        description: "Adds a new sheet/tab to a spreadsheet.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            spreadsheet_id: {
+              type: "string",
+              description: "The spreadsheet ID. If omitted, uses the configured default.",
+            },
+            title: {
+              type: "string",
+              description: "Name for the new sheet/tab.",
+            },
+          },
+          required: ["title"],
+        },
+      },
+      {
         name: "get_sheet_data",
         description: "Reads data from a range in a sheet/tab.",
         inputSchema: {
@@ -325,28 +216,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             include_grid_data: {
               type: "boolean",
               description: "If True, returns full grid data including formatting/metadata. Default is False.",
-            },
-          },
-          required: ["sheet"],
-        },
-      },
-      {
-        name: "get_sheet_formulas",
-        description: "Reads formulas from a range in a sheet/tab.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet_id: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses the configured default.",
-            },
-            sheet: {
-              type: "string",
-              description: "Name of the sheet/tab (e.g., 'Sheet1').",
-            },
-            range: {
-              type: "string",
-              description: "Optional A1 notation (e.g., 'A1:C10'). If omitted, reads all formulas.",
             },
           },
           required: ["sheet"],
@@ -402,102 +271,68 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "add_rows",
-        description: "Adds (inserts) empty rows to a sheet/tab at a specified index.",
+        name: "add_dropdown_validation",
+        description: "Applies data validation dropdown rules to a specific column range in Google Sheets.",
         inputSchema: {
           type: "object",
           properties: {
-            spreadsheet_id: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses the configured default.",
-            },
-            sheet: {
-              type: "string",
-              description: "Name of the sheet/tab.",
-            },
-            count: {
+            sheetId: {
               type: "integer",
-              description: "Number of empty rows to insert.",
+              description: "The ID of the sheet tab. Default is 0.",
             },
-            start_row: {
+            startRowIndex: {
               type: "integer",
-              description: "0-based row index to start inserting. Defaults to 0.",
+              description: "Starting row index (0-based). Default is 2 (Row 3).",
             },
-          },
-          required: ["sheet", "count"],
-        },
-      },
-      {
-        name: "list_sheets",
-        description: "Lists all sheet/tab names within a spreadsheet.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet_id: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses the configured default.",
+            endRowIndex: {
+              type: "integer",
+              description: "Ending row index. Default is 1000.",
             },
-          },
-        },
-      },
-      {
-        name: "create_sheet",
-        description: "Adds a new sheet/tab to a spreadsheet.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet_id: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses the configured default.",
+            columnIndex: {
+              type: "integer",
+              description: "The 0-based column index to apply validation to (e.g., 3 for Column D).",
             },
-            title: {
-              type: "string",
-              description: "Name for the new sheet/tab.",
-            },
-          },
-          required: ["title"],
-        },
-      },
-      {
-        name: "get_multiple_sheet_data",
-        description: "Fetches data from multiple ranges across potentially different spreadsheets in one call.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            queries: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  spreadsheet_id: { type: "string", description: "Optional spreadsheet ID." },
-                  sheet: { type: "string", description: "Sheet/tab name." },
-                  range: { type: "string", description: "Optional A1 notation range." },
-                },
-                required: ["sheet"],
-              },
-              description: "Array of query objects.",
-            },
-          },
-          required: ["queries"],
-        },
-      },
-      {
-        name: "get_multiple_spreadsheet_summary",
-        description: "Gets titles, sheet/tab names, headers, and first few rows for multiple spreadsheets.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet_ids: {
+            options: {
               type: "array",
               items: { type: "string" },
-              description: "IDs of the spreadsheets.",
-            },
-            rows_to_fetch: {
-              type: "integer",
-              description: "How many rows to fetch as preview (default 5).",
+              description: "Array of allowed string options. Example: ['Completed', 'Pending', 'In Progress']",
             },
           },
-          required: ["spreadsheet_ids"],
+          required: ["columnIndex", "options"],
+        },
+      },
+      {
+        name: "format_google_sheet",
+        description: "Updates formatting (e.g., font family) of cells in a Google Sheet.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            fontFamily: {
+              type: "string",
+              description: "The font family name to apply. e.g., 'Times New Roman'",
+            },
+            sheetId: {
+              type: "integer",
+              description: "The ID of the sheet tab. Default is 0.",
+            },
+            startRowIndex: {
+              type: "integer",
+              description: "Starting row index (0-based). Default is 0.",
+            },
+            endRowIndex: {
+              type: "integer",
+              description: "Ending row index (exclusive). Default is 1000.",
+            },
+            startColumnIndex: {
+              type: "integer",
+              description: "Starting column index. Default is 0.",
+            },
+            endColumnIndex: {
+              type: "integer",
+              description: "Ending column index. Default is 26.",
+            },
+          },
+          required: ["fontFamily"],
         },
       },
       {
@@ -527,134 +362,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ["recipients"],
-        },
-      },
-      {
-        name: "add_columns",
-        description: "Adds (inserts) empty columns to a sheet/tab at a specified index.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet_id: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses the configured default.",
-            },
-            sheet: {
-              type: "string",
-              description: "Name of the sheet/tab.",
-            },
-            count: {
-              type: "integer",
-              description: "Number of empty columns to insert.",
-            },
-            start_column: {
-              type: "integer",
-              description: "0-based column index to start inserting. Defaults to 0.",
-            },
-          },
-          required: ["sheet", "count"],
-        },
-      },
-      {
-        name: "copy_sheet",
-        description: "Duplicates a sheet/tab from one spreadsheet to another and optionally renames it.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            src_spreadsheet: {
-              type: "string",
-              description: "Source spreadsheet ID. If omitted, uses configured default.",
-            },
-            src_sheet: {
-              type: "string",
-              description: "Source sheet/tab name.",
-            },
-            dst_spreadsheet: {
-              type: "string",
-              description: "Destination spreadsheet ID.",
-            },
-            dst_sheet: {
-              type: "string",
-              description: "Desired name in destination. If omitted, uses 'Copy of [src_sheet]'.",
-            },
-          },
-          required: ["src_sheet", "dst_spreadsheet"],
-        },
-      },
-      {
-        name: "rename_sheet",
-        description: "Renames an existing sheet/tab.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses configured default.",
-            },
-            sheet: {
-              type: "string",
-              description: "Current sheet/tab name.",
-            },
-            new_name: {
-              type: "string",
-              description: "New sheet/tab name.",
-            },
-          },
-          required: ["sheet", "new_name"],
-        },
-      },
-      {
-        name: "add_chart",
-        description: "Creates a chart in a Google Spreadsheet from specified data.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheet_id: {
-              type: "string",
-              description: "The spreadsheet ID. If omitted, uses configured default.",
-            },
-            sheet: {
-              type: "string",
-              description: "Name of the sheet containing data.",
-            },
-            chart_type: {
-              type: "string",
-              description: "COLUMN, BAR, LINE, AREA, PIE, SCATTER, COMBO, HISTOGRAM.",
-            },
-            data_range: {
-              type: "string",
-              description: "A1 notation range for chart data (e.g. 'A1:C10'). First row is treated as headers.",
-            },
-            title: {
-              type: "string",
-              description: "Chart title.",
-            },
-            x_axis_label: {
-              type: "string",
-              description: "Label for the X axis.",
-            },
-            y_axis_label: {
-              type: "string",
-              description: "Label for the Y axis.",
-            },
-            position_x: {
-              type: "integer",
-              description: "Horizontal offset in pixels.",
-            },
-            position_y: {
-              type: "integer",
-              description: "Vertical offset in pixels.",
-            },
-            width: {
-              type: "integer",
-              description: "Width in pixels. Default is 600.",
-            },
-            height: {
-              type: "integer",
-              description: "Height in pixels. Default is 400.",
-            },
-          },
-          required: ["sheet", "chart_type", "data_range"],
         },
       },
     ],
@@ -748,130 +455,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
     const toolName = request.params.name;
     const args = request.params.arguments || {};
 
-    // 1. read_google_sheet (original)
-    if (toolName === "read_google_sheet") {
-      const range = args.range;
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: DEFAULT_SPREADSHEET_ID,
-        range: range,
-      });
-      const rows = res.data.values || [];
-      return {
-        content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
-      };
-    }
-
-    // 2. update_google_sheet (original)
-    if (toolName === "update_google_sheet") {
-      const range = args.range;
-      const valuesArray = args.values;
-      const resource = { values: [valuesArray] };
-      const result = await sheets.spreadsheets.values.update({
-        spreadsheetId: DEFAULT_SPREADSHEET_ID,
-        range: range,
-        valueInputOption: "USER_ENTERED",
-        resource,
-      });
-      return {
-        content: [{ type: "text", text: `Success! ${result.data.updatedCells} cells updated in Google Sheets.` }],
-      };
-    }
-
-    // 3. format_google_sheet (original)
-    if (toolName === "format_google_sheet") {
-      const fontFamily = args.fontFamily;
-      const sheetId = args.sheetId || 0;
-      const startRowIndex = args.startRowIndex || 0;
-      const endRowIndex = args.endRowIndex || 1000;
-      const startColumnIndex = args.startColumnIndex || 0;
-      const endColumnIndex = args.endColumnIndex || 26;
-
-      const requests = [{
-        repeatCell: {
-          range: { sheetId, startRowIndex, endRowIndex, startColumnIndex, endColumnIndex },
-          cell: { userEnteredFormat: { textFormat: { fontFamily } } },
-          fields: "userEnteredFormat.textFormat.fontFamily",
-        },
-      }];
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: DEFAULT_SPREADSHEET_ID,
-        resource: { requests },
-      });
-      return {
-        content: [{ type: "text", text: `Success! Formatting applied to sheet.` }],
-      };
-    }
-
-    // 4. add_dropdown_validation (original)
-    if (toolName === "add_dropdown_validation") {
-      const sheetId = args.sheetId || 0;
-      const startRowIndex = args.startRowIndex || 2;
-      const endRowIndex = args.endRowIndex || 1000;
-      const colIndex = args.columnIndex;
-      const options = args.options;
-
-      const values = options.map((opt) => ({ userEnteredValue: opt }));
-      const requests = [{
-        setDataValidation: {
-          range: { sheetId, startRowIndex, endRowIndex, startColumnIndex: colIndex, endColumnIndex: colIndex + 1 },
-          rule: {
-            condition: { type: "ONE_OF_LIST", values },
-            showCustomUi: true,
-            strict: false,
-          },
-        },
-      }];
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: DEFAULT_SPREADSHEET_ID,
-        resource: { requests },
-      });
-      return {
-        content: [{ type: "text", text: `Success! Dropdown validation rules applied to column index ${colIndex}.` }],
-      };
-    }
-
-    // 5. remove_dropdown_validation (original)
-    if (toolName === "remove_dropdown_validation") {
-      const sheetId = args.sheetId || 0;
-      const startRowIndex = args.startRowIndex || 56;
-      const endRowIndex = args.endRowIndex || 1000;
-      const colIndex = args.columnIndex;
-
-      const requests = [{
-        setDataValidation: {
-          range: { sheetId, startRowIndex, endRowIndex, startColumnIndex: colIndex, endColumnIndex: colIndex + 1 },
-        },
-      }];
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: DEFAULT_SPREADSHEET_ID,
-        resource: { requests },
-      });
-      return {
-        content: [{ type: "text", text: `Success! Validation rules removed from column index ${colIndex}.` }],
-      };
-    }
-
-    // 6. create_sheet_tab (original)
-    if (toolName === "create_sheet_tab") {
-      const title = args.title;
-      const requests = [{ addSheet: { properties: { title } } }];
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: DEFAULT_SPREADSHEET_ID,
-        resource: { requests },
-      });
-      return {
-        content: [{ type: "text", text: `Success! Sheet tab '${title}' created successfully.` }],
-      };
-    }
-
-    // ==========================================
-    // NEW POWER TOOLS IMPLEMENTATION
-    // ==========================================
-
-    // 7. list_spreadsheets
+    // 1. list_spreadsheets
     if (toolName === "list_spreadsheets") {
       const folderId = args.folder_id;
       let q = "mimeType = 'application/vnd.google-apps.spreadsheet'";
@@ -888,7 +472,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
       };
     }
 
-    // 8. create_spreadsheet
+    // 2. create_spreadsheet
     if (toolName === "create_spreadsheet") {
       const title = args.title;
       const folderId = args.folder_id;
@@ -923,7 +507,34 @@ Once you authorize the application, the tokens will be automatically saved to yo
       };
     }
 
-    // 9. get_sheet_data
+    // 3. list_sheets
+    if (toolName === "list_sheets") {
+      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
+      const res = await sheets.spreadsheets.get({ spreadsheetId });
+      const titles = (res.data.sheets || []).map((s) => s.properties.title);
+      return {
+        content: [{ type: "text", text: JSON.stringify(titles, null, 2) }],
+      };
+    }
+
+    // 4. create_sheet
+    if (toolName === "create_sheet") {
+      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
+      const title = args.title;
+
+      const requests = [{ addSheet: { properties: { title } } }];
+      const res = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: { requests },
+      });
+
+      const props = res.data.replies[0].addSheet.properties;
+      return {
+        content: [{ type: "text", text: JSON.stringify(props, null, 2) }],
+      };
+    }
+
+    // 5. get_sheet_data
     if (toolName === "get_sheet_data") {
       const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
       const sheet = args.sheet;
@@ -952,26 +563,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
       }
     }
 
-    // 10. get_sheet_formulas
-    if (toolName === "get_sheet_formulas") {
-      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-      const sheet = args.sheet;
-      const range = args.range;
-
-      const rangeString = range ? `${sheet}!${range}` : sheet;
-
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: rangeString,
-        valueRenderOption: "FORMULA",
-      });
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(res.data.values || [], null, 2) }],
-      };
-    }
-
-    // 11. update_cells
+    // 6. update_cells
     if (toolName === "update_cells") {
       const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
       const sheet = args.sheet;
@@ -992,7 +584,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
       };
     }
 
-    // 12. batch_update_cells
+    // 7. batch_update_cells
     if (toolName === "batch_update_cells") {
       const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
       const sheet = args.sheet;
@@ -1016,129 +608,62 @@ Once you authorize the application, the tokens will be automatically saved to yo
       };
     }
 
-    // 13. add_rows
-    if (toolName === "add_rows") {
-      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-      const sheet = args.sheet;
-      const count = args.count;
-      const startRow = args.start_row || 0;
+    // 8. add_dropdown_validation
+    if (toolName === "add_dropdown_validation") {
+      const sheetId = args.sheetId || 0;
+      const startRowIndex = args.startRowIndex || 2;
+      const endRowIndex = args.endRowIndex || 1000;
+      const colIndex = args.columnIndex;
+      const options = args.options;
 
-      const sheetId = await getSheetIdByName(sheets, spreadsheetId, sheet);
-
+      const values = options.map((opt) => ({ userEnteredValue: opt }));
       const requests = [{
-        insertDimension: {
-          range: {
-            sheetId,
-            dimension: "ROWS",
-            startIndex: startRow,
-            endIndex: startRow + count,
+        setDataValidation: {
+          range: { sheetId, startRowIndex, endRowIndex, startColumnIndex: colIndex, endColumnIndex: colIndex + 1 },
+          rule: {
+            condition: { type: "ONE_OF_LIST", values },
+            showCustomUi: true,
+            strict: false,
           },
-          inheritFromBefore: true,
         },
       }];
 
-      const res = await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: DEFAULT_SPREADSHEET_ID,
         resource: { requests },
       });
-
       return {
-        content: [{ type: "text", text: `Success! Inserted ${count} rows at index ${startRow} in sheet '${sheet}'.` }],
+        content: [{ type: "text", text: `Success! Dropdown validation rules applied to column index ${colIndex}.` }],
       };
     }
 
-    // 14. list_sheets
-    if (toolName === "list_sheets") {
-      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-      const res = await sheets.spreadsheets.get({ spreadsheetId });
-      const titles = (res.data.sheets || []).map((s) => s.properties.title);
-      return {
-        content: [{ type: "text", text: JSON.stringify(titles, null, 2) }],
-      };
-    }
+    // 9. format_google_sheet
+    if (toolName === "format_google_sheet") {
+      const fontFamily = args.fontFamily;
+      const sheetId = args.sheetId || 0;
+      const startRowIndex = args.startRowIndex || 0;
+      const endRowIndex = args.endRowIndex || 1000;
+      const startColumnIndex = args.startColumnIndex || 0;
+      const endColumnIndex = args.endColumnIndex || 26;
 
-    // 15. create_sheet
-    if (toolName === "create_sheet") {
-      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-      const title = args.title;
+      const requests = [{
+        repeatCell: {
+          range: { sheetId, startRowIndex, endRowIndex, startColumnIndex, endColumnIndex },
+          cell: { userEnteredFormat: { textFormat: { fontFamily } } },
+          fields: "userEnteredFormat.textFormat.fontFamily",
+        },
+      }];
 
-      const requests = [{ addSheet: { properties: { title } } }];
-      const res = await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: DEFAULT_SPREADSHEET_ID,
         resource: { requests },
       });
-
-      const props = res.data.replies[0].addSheet.properties;
       return {
-        content: [{ type: "text", text: JSON.stringify(props, null, 2) }],
+        content: [{ type: "text", text: `Success! Formatting applied to sheet.` }],
       };
     }
 
-    // 16. get_multiple_sheet_data
-    if (toolName === "get_multiple_sheet_data") {
-      const queries = args.queries;
-
-      const results = await Promise.all(
-        queries.map(async (q) => {
-          const sId = q.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-          const rangeString = q.range ? `${q.sheet}!${q.range}` : q.sheet;
-          try {
-            const res = await sheets.spreadsheets.values.get({
-              spreadsheetId: sId,
-              range: rangeString,
-            });
-            return { query: q, data: res.data.values || [] };
-          } catch (e) {
-            return { query: q, error: e.message };
-          }
-        })
-      );
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-      };
-    }
-
-    // 17. get_multiple_spreadsheet_summary
-    if (toolName === "get_multiple_spreadsheet_summary") {
-      const spreadsheetIds = args.spreadsheet_ids;
-      const rowsToFetch = args.rows_to_fetch || 5;
-
-      const summaries = await Promise.all(
-        spreadsheetIds.map(async (id) => {
-          try {
-            const metadata = await sheets.spreadsheets.get({ spreadsheetId: id });
-            const title = metadata.data.properties.title;
-            const sheetTabs = (metadata.data.sheets || []).map((s) => s.properties.title);
-
-            let previewData = [];
-            if (sheetTabs.length > 0) {
-              const previewRes = await sheets.spreadsheets.values.get({
-                spreadsheetId: id,
-                range: `${sheetTabs[0]}!A1:Z${rowsToFetch}`,
-              });
-              previewData = previewRes.data.values || [];
-            }
-
-            return {
-              spreadsheetId: id,
-              title,
-              tabs: sheetTabs,
-              previewTab: sheetTabs[0] || null,
-              previewRows: previewData,
-            };
-          } catch (e) {
-            return { spreadsheetId: id, error: e.message };
-          }
-        })
-      );
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(summaries, null, 2) }],
-      };
-    }
-
-    // 18. share_spreadsheet
+    // 10. share_spreadsheet
     if (toolName === "share_spreadsheet") {
       const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
       const recipients = args.recipients;
@@ -1171,246 +696,6 @@ Once you authorize the application, the tokens will be automatically saved to yo
             success: successes,
             failed: failures,
           }, null, 2),
-        }],
-      };
-    }
-
-    // 19. add_columns
-    if (toolName === "add_columns") {
-      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-      const sheet = args.sheet;
-      const count = args.count;
-      const startColumn = args.start_column || 0;
-
-      const sheetId = await getSheetIdByName(sheets, spreadsheetId, sheet);
-
-      const requests = [{
-        insertDimension: {
-          range: {
-            sheetId,
-            dimension: "COLUMNS",
-            startIndex: startColumn,
-            endIndex: startColumn + count,
-          },
-          inheritFromBefore: true,
-        },
-      }];
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        resource: { requests },
-      });
-
-      return {
-        content: [{ type: "text", text: `Success! Inserted ${count} columns at index ${startColumn} in sheet '${sheet}'.` }],
-      };
-    }
-
-    // 20. copy_sheet
-    if (toolName === "copy_sheet") {
-      const srcSpreadsheet = args.src_spreadsheet || DEFAULT_SPREADSHEET_ID;
-      const srcSheetName = args.src_sheet;
-      const dstSpreadsheet = args.dst_spreadsheet;
-      const dstSheetName = args.dst_sheet;
-
-      const srcSheetId = await getSheetIdByName(sheets, srcSpreadsheet, srcSheetName);
-
-      const copyRes = await sheets.spreadsheets.sheets.copyTo({
-        spreadsheetId: srcSpreadsheet,
-        sheetId: srcSheetId,
-        resource: {
-          destinationSpreadsheetId: dstSpreadsheet,
-        },
-      });
-
-      const newSheetId = copyRes.data.sheetId;
-
-      if (dstSheetName) {
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: dstSpreadsheet,
-          resource: {
-            requests: [{
-              updateSheetProperties: {
-                properties: {
-                  sheetId: newSheetId,
-                  title: dstSheetName,
-                },
-                fields: "title",
-              },
-            }],
-          },
-        });
-      }
-
-      return {
-        content: [{
-          type: "text",
-          text: `Success! Sheet '${srcSheetName}' copied from ${srcSpreadsheet} to ${dstSpreadsheet}.${dstSheetName ? ` Renamed destination tab to '${dstSheetName}'.` : ""}`,
-        }],
-      };
-    }
-
-    // 21. rename_sheet
-    if (toolName === "rename_sheet") {
-      const spreadsheetId = args.spreadsheet || DEFAULT_SPREADSHEET_ID;
-      const sheet = args.sheet;
-      const newName = args.new_name;
-
-      const sheetId = await getSheetIdByName(sheets, spreadsheetId, sheet);
-
-      const requests = [{
-        updateSheetProperties: {
-          properties: {
-            sheetId,
-            title: newName,
-          },
-          fields: "title",
-        },
-      }];
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        resource: { requests },
-      });
-
-      return {
-        content: [{ type: "text", text: `Success! Renamed sheet tab '${sheet}' to '${newName}'.` }],
-      };
-    }
-
-    // 22. add_chart
-    if (toolName === "add_chart") {
-      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
-      const sheet = args.sheet;
-      const chartType = args.chart_type; // COLUMN, BAR, LINE, AREA, PIE, SCATTER, COMBO, HISTOGRAM
-      const dataRange = args.data_range;
-      const title = args.title;
-      const xAxisLabel = args.x_axis_label;
-      const yAxisLabel = args.y_axis_label;
-      const positionX = args.position_x || 0;
-      const positionY = args.position_y || 0;
-      const width = args.width || 600;
-      const height = args.height || 400;
-
-      const sheetId = await getSheetIdByName(sheets, spreadsheetId, sheet);
-      const rangeSpec = parseA1Range(dataRange);
-
-      const chartSpec = {
-        title: title || `${chartType} Chart`,
-        position: {
-          overlayPosition: {
-            anchorCell: {
-              sheetId,
-              rowIndex: 0,
-              columnIndex: 6, // Offset to right (Column G) to prevent overlapping data
-            },
-            offsetXPixels: positionX,
-            offsetYPixels: positionY,
-            widthPixels: width,
-            heightPixels: height,
-          },
-        },
-      };
-
-      if (chartType === "PIE") {
-        chartSpec.pieChart = {
-          threeDimensional: false,
-          domain: {
-            sourceRange: {
-              sources: [{
-                sheetId,
-                startRowIndex: rangeSpec.startRowIndex + 1, // Skip header
-                endRowIndex: rangeSpec.endRowIndex,
-                startColumnIndex: rangeSpec.startColumnIndex,
-                endColumnIndex: rangeSpec.startColumnIndex + 1,
-              }],
-            },
-          },
-          series: {
-            sourceRange: {
-              sources: [{
-                sheetId,
-                startRowIndex: rangeSpec.startRowIndex + 1,
-                endRowIndex: rangeSpec.endRowIndex,
-                startColumnIndex: rangeSpec.startColumnIndex + 1,
-                endColumnIndex: rangeSpec.endColumnIndex,
-              }],
-            },
-          },
-        };
-      } else {
-        chartSpec.basicChart = {
-          chartType: chartType,
-          legendPosition: "BOTTOM_LEGEND",
-          headerCount: 1, // Assume first row is header
-          domains: [{
-            domain: {
-              sourceRange: {
-                sources: [{
-                  sheetId,
-                  startRowIndex: rangeSpec.startRowIndex,
-                  endRowIndex: rangeSpec.endRowIndex,
-                  startColumnIndex: rangeSpec.startColumnIndex,
-                  endColumnIndex: rangeSpec.startColumnIndex + 1,
-                }],
-              },
-            },
-          }],
-          series: [],
-        };
-
-        // Add additional series for each Y-value column
-        for (let col = rangeSpec.startColumnIndex + 1; col < rangeSpec.endColumnIndex; col++) {
-          chartSpec.basicChart.series.push({
-            series: {
-              sourceRange: {
-                sources: [{
-                  sheetId,
-                  startRowIndex: rangeSpec.startRowIndex,
-                  endRowIndex: rangeSpec.endRowIndex,
-                  startColumnIndex: col,
-                  endColumnIndex: col + 1,
-                }],
-              },
-            },
-            targetAxis: "LEFT_AXIS",
-          });
-        }
-
-        if (xAxisLabel || yAxisLabel) {
-          chartSpec.basicChart.axes = [];
-          if (xAxisLabel) {
-            chartSpec.basicChart.axes.push({
-              position: "BOTTOM_AXIS",
-              title: xAxisLabel,
-            });
-          }
-          if (yAxisLabel) {
-            chartSpec.basicChart.axes.push({
-              position: "LEFT_AXIS",
-              title: yAxisLabel,
-            });
-          }
-        }
-      }
-
-      const res = await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        resource: {
-          requests: [{
-            addChart: {
-              chart: { spec: chartSpec },
-            },
-          }],
-        },
-      });
-
-      const reply = res.data.replies[0].addChart.chart;
-
-      return {
-        content: [{
-          type: "text",
-          text: `Success! Created a beautiful ${chartType} chart. Chart ID: ${reply.chartId}`,
         }],
       };
     }

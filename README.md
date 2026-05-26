@@ -788,6 +788,11 @@ Give the AI your column mapping so it knows where to write:
 
 ---
 
+
+> *"Important thing is i use only 10 tools you can add more tools if you want to."*
+
+---
+
 ## 🔒 Security
 
 - 🔐 Your `.env` file containing all secrets is listed in `.gitignore` — it is **never** pushed to GitHub
