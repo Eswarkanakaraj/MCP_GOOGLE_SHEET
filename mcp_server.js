@@ -364,6 +364,59 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["recipients"],
         },
       },
+      {
+        name: "copy_data_validation",
+        description: "Copies data validation rules from a source range to a destination range.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            spreadsheet_id: {
+              type: "string",
+              description: "The spreadsheet ID. If omitted, uses the configured default.",
+            },
+            sheetId: {
+              type: "integer",
+              description: "The ID of the sheet tab. Default is 0.",
+            },
+            startRowIndex: {
+              type: "integer",
+              description: "Source start row index (0-based).",
+            },
+            endRowIndex: {
+              type: "integer",
+              description: "Source end row index (0-based).",
+            },
+            startColumnIndex: {
+              type: "integer",
+              description: "Source start column index (0-based).",
+            },
+            endColumnIndex: {
+              type: "integer",
+              description: "Source end column index (0-based).",
+            },
+            dstStartRowIndex: {
+              type: "integer",
+              description: "Destination start row index (0-based).",
+            },
+            dstEndRowIndex: {
+              type: "integer",
+              description: "Destination end row index (0-based).",
+            },
+            dstStartColumnIndex: {
+              type: "integer",
+              description: "Destination start column index (0-based).",
+            },
+            dstEndColumnIndex: {
+              type: "integer",
+              description: "Destination end column index (0-based).",
+            },
+          },
+          required: [
+            "startRowIndex", "endRowIndex", "startColumnIndex", "endColumnIndex",
+            "dstStartRowIndex", "dstEndRowIndex", "dstStartColumnIndex", "dstEndColumnIndex"
+          ],
+        },
+      },
     ],
   };
 });
@@ -541,7 +594,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
       const range = args.range;
       const includeGridData = args.include_grid_data || false;
 
-      const rangeString = range ? `${sheet}!${range}` : sheet;
+      const rangeString = range ? `'${sheet}'!${range}` : `'${sheet}'`;
 
       if (includeGridData) {
         const res = await sheets.spreadsheets.get({
@@ -570,7 +623,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
       const range = args.range;
       const data = args.data;
 
-      const rangeString = `${sheet}!${range}`;
+      const rangeString = `'${sheet}'!${range}`;
 
       const res = await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -591,7 +644,7 @@ Once you authorize the application, the tokens will be automatically saved to yo
       const ranges = args.ranges; // Object mapping range -> 2D array
 
       const data = Object.keys(ranges).map((r) => ({
-        range: `${sheet}!${r}`,
+        range: `'${sheet}'!${r}`,
         values: ranges[r],
       }));
 
@@ -697,6 +750,37 @@ Once you authorize the application, the tokens will be automatically saved to yo
             failed: failures,
           }, null, 2),
         }],
+      };
+    }
+
+    // copy_data_validation
+    if (toolName === "copy_data_validation") {
+      const spreadsheetId = args.spreadsheet_id || DEFAULT_SPREADSHEET_ID;
+      const sheetId = args.sheetId || 0;
+      const startRowIndex = args.startRowIndex;
+      const endRowIndex = args.endRowIndex;
+      const startColumnIndex = args.startColumnIndex;
+      const endColumnIndex = args.endColumnIndex;
+      const dstStartRowIndex = args.dstStartRowIndex;
+      const dstEndRowIndex = args.dstEndRowIndex;
+      const dstStartColumnIndex = args.dstStartColumnIndex;
+      const dstEndColumnIndex = args.dstEndColumnIndex;
+
+      const requests = [{
+        copyPaste: {
+          source: { sheetId, startRowIndex, endRowIndex, startColumnIndex, endColumnIndex },
+          destination: { sheetId, startRowIndex: dstStartRowIndex, endRowIndex: dstEndRowIndex, startColumnIndex: dstStartColumnIndex, endColumnIndex: dstEndColumnIndex },
+          pasteType: "PASTE_DATA_VALIDATION",
+          pasteOrientation: "NORMAL"
+        }
+      }];
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: { requests },
+      });
+      return {
+        content: [{ type: "text", text: `Success! Data validation copied successfully.` }],
       };
     }
 
